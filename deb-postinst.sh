@@ -53,11 +53,13 @@ PACKAGES_TO_INSTALL=(
     okular
     print-manager
     network-manager
+    wget
+    curl
     "${BROWSER_PACKAGES[@]}"
 )
 
 echo ""
-echo "--- Choix des logiciels optionnels ---"
+echo "--- Choix des logiciels optionnels (Dépôts Debian) ---"
 
 # LibreOffice
 read -rp "Voudrais-tu LibreOffice sur ton système ? (y/N) : " opt_office
@@ -96,6 +98,12 @@ if [[ "$opt_steam" =~ ^[Yy]$ ]]; then
     PACKAGES_TO_INSTALL+=(steam-installer)
 fi
 
+# VirtualBox
+read -rp "Voudrais-tu VirtualBox sur ton système ? (y/N) : " opt_vbox
+if [[ "$opt_vbox" =~ ^[Yy]$ ]]; then
+    PACKAGES_TO_INSTALL+=(virtualbox linux-headers-amd64)
+fi
+
 # Audacity
 read -rp "Voudrais-tu Audacity sur ton système ? (y/N) : " opt_audacity
 if [[ "$opt_audacity" =~ ^[Yy]$ ]]; then
@@ -108,8 +116,16 @@ if [[ "$opt_kdenlive" =~ ^[Yy]$ ]]; then
     PACKAGES_TO_INSTALL+=(kdenlive)
 fi
 
+# --- Logiciels externes (.deb) ---
+echo ""
+echo "--- Choix des logiciels externes (.deb) ---"
+
+read -rp "Voudrais-tu Google Chrome ? (y/N) : " opt_chrome
+read -rp "Voudrais-tu Discord ? (y/N) : " opt_discord
+read -rp "Voudrais-tu Heroic Games Launcher ? (y/N) : " opt_heroic
+
 # -----------------------------------------------------------------------------
-# 3. Mise à jour du système et installation des paquets
+# 3. Mise à jour du système et installation des paquets des dépôts
 # -----------------------------------------------------------------------------
 echo ""
 echo "=== Mise à jour des dépôts et du système ==="
@@ -117,11 +133,50 @@ apt-get update -y
 apt-get dist-upgrade -y
 
 echo ""
-echo "=== Installation des paquets sélectionnés ==="
+echo "=== Installation des paquets sélectionnés (Dépôts Debian) ==="
 apt-get install -y "${PACKAGES_TO_INSTALL[@]}"
 
 # -----------------------------------------------------------------------------
-# 4. Modification de /etc/network/interfaces
+# 4. Installation des paquets externes (.deb)
+# -----------------------------------------------------------------------------
+TMP_DIR=$(mktemp -d)
+
+# Google Chrome
+if [[ "$opt_chrome" =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "=== Téléchargement et installation de Google Chrome ==="
+    wget -O "$TMP_DIR/chrome.deb" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+    apt-get install -y "$TMP_DIR/chrome.deb"
+fi
+
+# Discord
+if [[ "$opt_discord" =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "=== Téléchargement et installation de Discord ==="
+    wget -O "$TMP_DIR/discord.deb" "https://discord.com/api/download?platform=linux&format=deb"
+    apt-get install -y "$TMP_DIR/discord.deb"
+fi
+
+# Heroic Games Launcher
+if [[ "$opt_heroic" =~ ^[Yy]$ ]]; then
+    echo ""
+    echo "=== Recherche de la dernière version d'Heroic Games Launcher ==="
+    HEROIC_URL=$(curl -s https://api.github.com/repos/Heroic-Games-Launcher/HeroicGamesLauncher/releases/latest | grep "browser_download_url.*_amd64.deb" | cut -d '"' -f 4)
+
+    if [ -n "$HEROIC_URL" ]; then
+        echo "Téléchargement d'Heroic Games Launcher..."
+        wget -O "$TMP_DIR/heroic.deb" "$HEROIC_URL"
+        apt-get install -y "$TMP_DIR/heroic.deb"
+    else
+        echo "Erreur : Impossible de récupérer le lien du paquet .deb d'Heroic Launcher."
+    fi
+fi
+
+# Nettoyage des fichiers temporaires
+rm -rf "$TMP_DIR"
+
+# -----------------------------------------------------------------------------
+# 5. Modification de /etc/network/interfaces
 # -----------------------------------------------------------------------------
 echo ""
 echo "=== Configuration de /etc/network/interfaces ==="
@@ -136,7 +191,7 @@ fi
 systemctl enable --now NetworkManager
 
 # -----------------------------------------------------------------------------
-# 5. Modification de /etc/default/grub et update-grub
+# 6. Modification de /etc/default/grub et update-grub
 # -----------------------------------------------------------------------------
 echo ""
 echo "=== Configuration de GRUB ==="
